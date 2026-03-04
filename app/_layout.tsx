@@ -1,32 +1,50 @@
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import "react-native-reanimated";
+import { useEffect } from 'react';
+import { Stack, router, useRootNavigationState } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import 'react-native-reanimated';
+import { loadProfile } from '@/lib/storage';
+import './global.css';
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import "./global.css";
+SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
-  anchor: "(tabs)",
+  anchor: '(tabs)',
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  // Wait for the navigation container to be fully ready before redirecting.
+  // Without this check, router.replace can fire before navigation is initialised
+  // and silently fail, leaving a blank screen.
+  const navigationState = useRootNavigationState();
+
+  useEffect(() => {
+    if (!navigationState?.key) return;
+
+    loadProfile()
+      .then(profile => {
+        if (!profile?.username) {
+          router.replace('/login');
+        }
+      })
+      .catch(() => {
+        // If storage read fails, send to login so the user can set up
+        router.replace('/login');
+      })
+      .finally(() => {
+        SplashScreen.hideAsync();
+      });
+  }, [navigationState?.key]);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: "modal", title: "Modal" }}
-        />
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="story/[id]" />
+        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <StatusBar style="dark" />
+    </>
   );
 }
